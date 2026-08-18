@@ -133,7 +133,12 @@ async def run() -> None:
                         elif command["action"] == "stop":
                             agent.stop()
                         elif command["action"] == "set_threshold":
-                            agent.threshold = command["threshold"]
+                            if agent.login_pending:
+                                agent.open_login(command["threshold"])
+                            elif agent.running:
+                                agent.start(command["threshold"])
+                            else:
+                                agent.threshold = command["threshold"]
                         elif command["action"] == "disconnect":
                             agent.stop()
                             CONFIG_PATH.unlink(missing_ok=True)

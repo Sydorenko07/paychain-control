@@ -3,7 +3,8 @@ tg?.ready(); tg?.expand();
 const headers = () => ({"Content-Type":"application/json", "X-Telegram-Init-Data": tg?.initData || ""});
 const $ = (id) => document.getElementById(id);
 let thresholdDirty = false;
-$("threshold").addEventListener("input", () => { thresholdDirty = true; });
+let thresholdTimer;
+$("threshold").addEventListener("input", () => { thresholdDirty = true; clearTimeout(thresholdTimer); thresholdTimer = setTimeout(() => command('set_threshold'), 700); });
 async function request(path, options = {}) { const r = await fetch(path, {...options, headers:{...headers(), ...(options.headers||{})}}); const data = await r.json(); if (!r.ok) throw new Error(data.detail || "Помилка"); return data; }
 async function refresh() { try { const s = await request('/api/state'); if (!thresholdDirty && document.activeElement !== $('threshold')) $('threshold').value = s.threshold; $('status').textContent = s.status; $('substatus').textContent = s.connected ? (s.running ? 'Моніторинг увімкнений' : 'Моніторинг зупинений') : 'Локальний агент не підключений'; $('dot').className = `dot ${s.connected ? 'ok' : ''}`; $('pair').hidden = s.connected; $('pair').disabled = s.paired && s.connected; $('pair').textContent = 'Підключити цей ПК'; $('disconnect').hidden = !s.paired; } catch(e) { $('status').textContent=e.message; } }
 async function command(action) { try { await request('/api/command',{method:'POST',body:JSON.stringify({action,threshold:Number($('threshold').value)})}); thresholdDirty = false; await refresh(); } catch(e) { tg?.showAlert?.(e.message) || alert(e.message); } }
