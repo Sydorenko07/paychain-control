@@ -3,7 +3,16 @@ $Root = (Resolve-Path $PSScriptRoot).Path
 $VenvPython = Join-Path $Root ".venv\Scripts\python.exe"
 $Requirements = Join-Path $Root "requirements.txt"
 
-Write-Host "Встановлення Paychain Agent у $Root" -ForegroundColor Cyan
+Write-Host "Installing Paychain Agent in $Root" -ForegroundColor Cyan
+
+$venvBroken = Test-Path $VenvPython
+if ($venvBroken) {
+    & $VenvPython --version *> $null
+    $venvBroken = $LASTEXITCODE -ne 0
+}
+if ($venvBroken) {
+    Remove-Item -LiteralPath (Join-Path $Root ".venv") -Recurse -Force
+}
 
 if (-not (Test-Path $VenvPython)) {
     $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
@@ -16,7 +25,7 @@ if (-not (Test-Path $VenvPython)) {
 }
 
 if (-not (Test-Path $VenvPython)) {
-    throw "Не вдалося створити .venv. Встанови Python 3.11 або 3.12 і запусти інсталятор ще раз."
+    throw "Could not create .venv. Install Python 3.11 or 3.12 and run the installer again."
 }
 
 & $VenvPython -m pip install --upgrade pip
@@ -30,5 +39,5 @@ $trigger = New-ScheduledTaskTrigger -AtLogOn
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Description "Paychain Telegram local agent" -Force | Out-Null
 Start-ScheduledTask -TaskName $taskName
 
-Write-Host "Готово. Агент запущений у фоні та чекає підключення через Telegram." -ForegroundColor Green
-Write-Host "Відкрий Mini App, натисни 'Підключити цей комп’ютер' і збережи agent-config.json у telegram_app." -ForegroundColor Yellow
+Write-Host "Done. The agent is running in the background and waiting for Telegram pairing." -ForegroundColor Green
+Write-Host "Open the Mini App, pair this computer, and save agent-config.json into telegram_app." -ForegroundColor Yellow
