@@ -1,0 +1,14 @@
+{
+  "offers_url": "https://app.paychain.fund/PUT_THE_OFFERS_PAGE_HERE",
+  "refresh_seconds": 2,
+  "minimum_amount_uah": 5000,
+  "offer_selector": "tr.mdc-data-table__row:has(td:has-text('UAH'))",
+  "offer_id_attribute": "",
+  "offer_key_selector": "",
+  "amount_selector": "td:has-text('UAH')",
+  "currency_selector": "td:has-text('UAH')",
+  "status_selector": "",
+  "action_menu_button_selector": "",
+  "accept_button_selector": "td.text-right button[data-pc-name='button']",
+  "active_statuses": ["active"]
+}

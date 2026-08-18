@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+telegram_app/settings.env
+telegram_app/agent-config.json
+telegram_app/control.sqlite3
+config.json
+storage_state.json
+processed_offers.json
+.browser-profile/
+.start_monitoring.signal
+logs/

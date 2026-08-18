@@ -1,0 +1,5 @@
+{
+  "server_ws_url": "wss://your-domain.example/ws/agent",
+  "agent_id": "paste-the-id-from-the-mini-app",
+  "agent_token": "paste-the-one-time-token-from-the-mini-app"
+}
