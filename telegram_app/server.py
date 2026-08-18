@@ -147,7 +147,7 @@ async def download_agent() -> Response:
     project_root = ROOT.parent
     files = (
         "main.py", "config.example.json", "requirements.txt",
-        "install_agent.ps1", "install_agent.cmd",
+        "install_agent.ps1", "install_agent.cmd", "START/install_agent.cmd",
         "telegram_app/__init__.py", "telegram_app/agent.py",
         "telegram_app/agent-config.example.json",
     )
@@ -185,7 +185,7 @@ async def dispatch_command(payload: Command, owner_id: str) -> dict[str, str]:
     row = row_for(owner_id)
     if not row:
         raise HTTPException(409, "Спершу підключіть локальний агент.")
-    if payload.action not in {"start", "stop", "set_threshold"}:
+    if payload.action not in {"start", "stop", "set_threshold", "disconnect"}:
         raise HTTPException(400, "Невідома команда.")
     if payload.action in {"start", "set_threshold"} and payload.threshold is None:
         raise HTTPException(400, "Вкажіть суму.")
@@ -193,6 +193,12 @@ async def dispatch_command(payload: Command, owner_id: str) -> dict[str, str]:
     if payload.threshold is not None:
         message["threshold"] = str(payload.threshold)
     socket = active_agents.get(row["agent_id"])
+    if payload.action == "disconnect":
+        if socket:
+            await socket.send_json(message)
+        with db() as connection:
+            connection.execute("DELETE FROM agents WHERE agent_id=?", (row["agent_id"],))
+        return {"ok": "true"}
     if not socket:
         raise HTTPException(409, "Локальний агент не підключений.")
     await socket.send_json(message)

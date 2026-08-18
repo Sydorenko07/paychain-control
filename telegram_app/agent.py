@@ -115,6 +115,11 @@ async def run() -> None:
                             agent.stop()
                         elif command["action"] == "set_threshold":
                             agent.threshold = command["threshold"]
+                        elif command["action"] == "disconnect":
+                            agent.stop()
+                            CONFIG_PATH.unlink(missing_ok=True)
+                            await socket.close(code=1000, reason="Disconnected by user")
+                            break
                     except asyncio.TimeoutError:
                         pass
                     await socket.send(json.dumps({"type": "status", "running": agent.running, "status": "Моніторинг працює" if agent.running else "Зупинено"}))
