@@ -51,6 +51,14 @@ copy telegram_app\settings.example.env telegram_app\settings.env
 
 Кнопка **«Запустити»** вмикає автоматичне підтвердження угод, сума яких не менша за вказаний поріг. Перед першим реальним запуском перевір поріг і сесію Paychain на тесті.
 
+Для спрощеного встановлення на Windows із кореня проєкту запусти PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install_agent.ps1
+```
+
+Інсталятор створює `.venv`, ставить залежності й Playwright, а також додає агента в автозапуск Windows. Після натискання **«Підключити цей комп’ютер»** завантаж файл `agent-config.json` і поклади його в папку `telegram_app`. Після цього CMD для щоденної роботи не потрібен.
+
 ## Розгортання на Railway
 
 Створи на [Railway](https://railway.app/) порожній проєкт і підключи GitHub-репозиторій з цією папкою. Файл `railway.json` уже налаштовує вебсервіс: Railway встановить залежності з `requirements.txt` і запустить `telegram_app.server:app` на виданому порту.

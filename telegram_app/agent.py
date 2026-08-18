@@ -61,17 +61,28 @@ class Agent:
             # Example: timestamp ПРИЙНЯТО | оффер abc | 2500.00 UAH
             parts = [part.strip() for part in line.split("|")]
             if len(parts) >= 3:
-                amount, currency = parts[-1].split(maxsplit=1)
-                events.append({"amount": amount, "currency": currency})
+                values = parts[-1].split(maxsplit=1)
+                if len(values) == 2:
+                    amount, currency = values
+                    events.append({"amount": amount, "currency": currency})
         return events
 
 
 async def run() -> None:
-    config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-    url = f"{config['server_ws_url']}?agent_id={config['agent_id']}&agent_token={config['agent_token']}"
-    agent = Agent(config)
+    # The Windows installer starts this process before the PC is paired.
+    # Keep it alive and wait for the one-time config from the Mini App.
+    agent = Agent({})
     while True:
+        if not CONFIG_PATH.exists():
+            await asyncio.sleep(5)
+            continue
         try:
+            config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+            required = ("server_ws_url", "agent_id", "agent_token")
+            if any(not str(config.get(key, "")).strip() for key in required):
+                await asyncio.sleep(5)
+                continue
+            url = f"{config['server_ws_url']}?agent_id={config['agent_id']}&agent_token={config['agent_token']}"
             async with websockets.connect(url, ping_interval=20) as socket:
                 await socket.send(json.dumps({"type": "status", "running": False, "status": "Агент готовий"}))
                 while True:
