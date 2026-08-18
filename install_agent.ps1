@@ -34,10 +34,17 @@ if (-not (Test-Path $VenvPython)) {
 
 $agentScript = Join-Path $Root "telegram_app\agent.py"
 $taskName = "Paychain Control Agent"
-$action = New-ScheduledTaskAction -Execute $VenvPython -Argument ('"{0}"' -f $agentScript) -WorkingDirectory $Root
-$trigger = New-ScheduledTaskTrigger -AtLogOn
-Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Description "Paychain Telegram local agent" -Force | Out-Null
-Start-ScheduledTask -TaskName $taskName
+$startup = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
+$shortcutPath = Join-Path $startup "Paychain Control Agent.lnk"
+$shell = New-Object -ComObject WScript.Shell
+$shortcut = $shell.CreateShortcut($shortcutPath)
+$shortcut.TargetPath = $VenvPython
+$shortcut.Arguments = ('"{0}"' -f $agentScript)
+$shortcut.WorkingDirectory = $Root
+$shortcut.WindowStyle = 7
+$shortcut.Save()
+Get-Process -Name python -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $VenvPython } | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Process -FilePath $VenvPython -ArgumentList ('"{0}"' -f $agentScript) -WorkingDirectory $Root -WindowStyle Hidden
 
 Write-Host "Done. The agent is running in the background and waiting for Telegram pairing." -ForegroundColor Green
 Write-Host "Open the Mini App, pair this computer, and save agent-config.json into telegram_app." -ForegroundColor Yellow
