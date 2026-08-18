@@ -113,6 +113,12 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Paychain Telegram control", lifespan=lifespan)
 
 
+@app.get("/health", include_in_schema=False)
+async def health() -> dict[str, str]:
+    """Railway health check endpoint that does not require Telegram auth."""
+    return {"status": "ok"}
+
+
 @app.get("/api/state")
 async def state(owner_id: str = Depends(telegram_user)) -> dict[str, Any]:
     row = row_for(owner_id)
