@@ -32,6 +32,7 @@ load_dotenv(ROOT / "settings.env")
 DB_PATH = Path(os.environ.get("DATABASE_PATH", ROOT / "control.sqlite3"))
 WEB_DIR = ROOT / "webapp"
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+BOT_INTERNAL_TOKEN = os.environ.get("BOT_INTERNAL_TOKEN", "")
 DEV_USER_ID = os.environ.get("DEV_TELEGRAM_USER_ID")
 active_agents: dict[str, WebSocket] = {}
 
@@ -104,6 +105,11 @@ class Command(BaseModel):
     threshold: float | None = Field(default=None, ge=0)
 
 
+class BotCommand(BaseModel):
+    owner_id: str
+    action: str
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     setup_db()
@@ -147,6 +153,10 @@ async def pair(owner_id: str = Depends(telegram_user)) -> dict[str, str]:
 
 @app.post("/api/command")
 async def command(payload: Command, owner_id: str = Depends(telegram_user)) -> dict[str, str]:
+    return await dispatch_command(payload, owner_id)
+
+
+async def dispatch_command(payload: Command, owner_id: str) -> dict[str, str]:
     row = row_for(owner_id)
     if not row:
         raise HTTPException(409, "Спершу підключіть локальний агент.")
@@ -165,6 +175,21 @@ async def command(payload: Command, owner_id: str = Depends(telegram_user)) -> d
         if payload.threshold is not None:
             connection.execute("UPDATE agents SET threshold=?, updated_at=? WHERE agent_id=?", (str(payload.threshold), int(time.time()), row["agent_id"]))
     return {"ok": "true"}
+
+
+@app.post("/api/bot-command")
+async def bot_command(
+    payload: BotCommand,
+    x_bot_internal_token: str | None = Header(default=None),
+) -> dict[str, str]:
+    """Accept commands from our Telegram bot without exposing user credentials."""
+    if not BOT_INTERNAL_TOKEN:
+        raise HTTPException(503, "BOT_INTERNAL_TOKEN не налаштовано на сервері.")
+    if not x_bot_internal_token or not hmac.compare_digest(x_bot_internal_token, BOT_INTERNAL_TOKEN):
+        raise HTTPException(403, "Некоректний внутрішній токен бота.")
+    if payload.action != "stop":
+        raise HTTPException(400, "Непідтримувана команда бота.")
+    return await dispatch_command(Command(action=payload.action), payload.owner_id)
 
 
 async def notify_telegram(owner_id: str, text: str) -> None:

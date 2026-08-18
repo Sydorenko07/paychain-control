@@ -65,7 +65,9 @@ copy telegram_app\settings.example.env telegram_app\settings.env
    python telegram_app/bot.py
    ```
 
-В обидва сервіси додай однакову змінну `TELEGRAM_BOT_TOKEN`. У сервіс `web` додай Volume, змонтуй його в `/data`, а в Variables додай `DATABASE_PATH=/data/control.sqlite3`. Після цього згенеруй Railway-домен для сервісу **web**, скопіюй його у `APP_URL` в обох сервісах і зроби Redeploy. У логах web-сервісу має з’явитися успішний старт Uvicorn, а `https://твій-домен/health` має відповісти `{"status":"ok"}`.
+В обидва сервіси додай однакові змінні `TELEGRAM_BOT_TOKEN` та `BOT_INTERNAL_TOKEN`. Для `BOT_INTERNAL_TOKEN` згенеруй випадкове значення (наприклад, `python -c "import secrets; print(secrets.token_urlsafe(32))"`) і не публікуй його. У сервіс `web` додай Volume, змонтуй його в `/data`, а в Variables додай `DATABASE_PATH=/data/control.sqlite3`. Після цього згенеруй Railway-домен для сервісу **web**, скопіюй його у `APP_URL` в обох сервісах і зроби Redeploy. У логах web-сервісу має з’явитися успішний старт Uvicorn, а `https://твій-домен/health` має відповісти `{"status":"ok"}`.
+
+Після підключення локального агента користувач може надіслати боту `/stop`. Бот зупинить лише агент, прив’язаний до Telegram-акаунта відправника.
 
 Потім у @BotFather відкрий створеного бота → **Bot Settings** → **Menu Button** або **Main Mini App** та вкажи цей самий Railway URL. Telegram підтримує запуск Mini App з кнопки меню та Main Mini App, що налаштовуються через BotFather. [Документація Telegram](https://core.telegram.org/bots/webapps)
 
