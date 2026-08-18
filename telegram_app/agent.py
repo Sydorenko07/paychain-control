@@ -28,9 +28,15 @@ class Agent:
         self.config = config
         self.process: subprocess.Popen[str] | None = None
         self.threshold = "5000"
+        self.login_pending = False
         self.activity_position = ACTIVITY_LOG.stat().st_size if ACTIVITY_LOG.exists() else 0
 
     def start(self, threshold: str) -> None:
+        if self.process and self.process.poll() is None and self.login_pending:
+            self.threshold = threshold
+            SIGNAL_PATH.write_text("start", encoding="utf-8")
+            self.login_pending = False
+            return
         self.stop()
         self.threshold = threshold
         SIGNAL_PATH.unlink(missing_ok=True)
@@ -40,10 +46,21 @@ class Agent:
         )
         SIGNAL_PATH.write_text("start", encoding="utf-8")
 
+    def open_login(self, threshold: str) -> None:
+        self.stop()
+        self.threshold = threshold
+        SIGNAL_PATH.unlink(missing_ok=True)
+        self.process = subprocess.Popen(
+            [str(Path(sys.executable)), str(ROOT / "main.py"), "--auto-accept", "--minimum-amount", threshold, "--start-signal", str(SIGNAL_PATH)],
+            cwd=ROOT,
+        )
+        self.login_pending = True
+
     def stop(self) -> None:
         if self.process and self.process.poll() is None:
             self.process.terminate()
         self.process = None
+        self.login_pending = False
         SIGNAL_PATH.unlink(missing_ok=True)
 
     @property
@@ -109,7 +126,9 @@ async def run() -> None:
                     try:
                         raw = await asyncio.wait_for(socket.recv(), timeout=1)
                         command = json.loads(raw)
-                        if command["action"] == "start":
+                        if command["action"] == "open_login":
+                            agent.open_login(command["threshold"])
+                        elif command["action"] == "start":
                             agent.start(command["threshold"])
                         elif command["action"] == "stop":
                             agent.stop()
@@ -122,7 +141,8 @@ async def run() -> None:
                             break
                     except asyncio.TimeoutError:
                         pass
-                    await socket.send(json.dumps({"type": "status", "running": agent.running, "status": "Моніторинг працює" if agent.running else "Зупинено"}))
+                    status = "Очікується вхід у Paychain" if agent.login_pending else ("Моніторинг працює" if agent.running else "Зупинено")
+                    await socket.send(json.dumps({"type": "status", "running": agent.running and not agent.login_pending, "status": status}))
                     for event in agent.new_activity():
                         await socket.send(json.dumps({"type": "status", "running": agent.running, "status": "Угоду прийнято", "accepted": True, **event}))
         except Exception:

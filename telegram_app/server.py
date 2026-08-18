@@ -185,9 +185,9 @@ async def dispatch_command(payload: Command, owner_id: str) -> dict[str, str]:
     row = row_for(owner_id)
     if not row:
         raise HTTPException(409, "Спершу підключіть локальний агент.")
-    if payload.action not in {"start", "stop", "set_threshold", "disconnect"}:
+    if payload.action not in {"start", "open_login", "stop", "set_threshold", "disconnect"}:
         raise HTTPException(400, "Невідома команда.")
-    if payload.action in {"start", "set_threshold"} and payload.threshold is None:
+    if payload.action in {"start", "open_login", "set_threshold"} and payload.threshold is None:
         raise HTTPException(400, "Вкажіть суму.")
     message: dict[str, Any] = {"type": "command", "action": payload.action}
     if payload.threshold is not None:
