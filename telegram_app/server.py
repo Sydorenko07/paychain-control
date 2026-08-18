@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import io
 import json
 import os
 import secrets
 import sqlite3
 import time
+import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -20,7 +22,7 @@ from urllib.parse import parse_qsl
 import httpx
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -137,6 +139,29 @@ async def state(owner_id: str = Depends(telegram_user)) -> dict[str, Any]:
         "threshold": row["threshold"],
         "status": row["last_status"],
     }
+
+
+@app.get("/download/agent")
+async def download_agent() -> Response:
+    """Return a clean, secret-free Windows agent bundle."""
+    project_root = ROOT.parent
+    files = (
+        "main.py", "config.example.json", "requirements.txt",
+        "install_agent.ps1", "install_agent.cmd",
+        "telegram_app/__init__.py", "telegram_app/agent.py",
+        "telegram_app/agent-config.example.json",
+    )
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as bundle:
+        for relative in files:
+            path = project_root / relative
+            if path.is_file():
+                bundle.write(path, relative)
+    return Response(
+        content=archive.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=paychain-agent.zip"},
+    )
 
 
 @app.post("/api/pair")

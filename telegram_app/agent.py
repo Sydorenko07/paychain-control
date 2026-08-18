@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +20,7 @@ HERE = Path(__file__).parent
 CONFIG_PATH = HERE / "agent-config.json"
 SIGNAL_PATH = ROOT / ".start_monitoring.signal"
 ACTIVITY_LOG = ROOT / "logs" / "activity.log"
+DOWNLOAD_CONFIG_PATH = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Downloads" / "agent-config.json"
 
 
 class Agent:
@@ -68,11 +71,28 @@ class Agent:
         return events
 
 
+def adopt_downloaded_config() -> bool:
+    """Move a valid one-time pairing file downloaded on this same PC."""
+    if CONFIG_PATH.exists() or not DOWNLOAD_CONFIG_PATH.exists():
+        return False
+    try:
+        config = json.loads(DOWNLOAD_CONFIG_PATH.read_text(encoding="utf-8"))
+        required = ("server_ws_url", "agent_id", "agent_token")
+        if any(not str(config.get(key, "")).strip() for key in required):
+            return False
+        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(DOWNLOAD_CONFIG_PATH), str(CONFIG_PATH))
+        return True
+    except (OSError, json.JSONDecodeError):
+        return False
+
+
 async def run() -> None:
     # The Windows installer starts this process before the PC is paired.
     # Keep it alive and wait for the one-time config from the Mini App.
     agent = Agent({})
     while True:
+        adopt_downloaded_config()
         if not CONFIG_PATH.exists():
             await asyncio.sleep(5)
             continue

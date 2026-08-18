@@ -32,6 +32,12 @@ if (-not (Test-Path $VenvPython)) {
 & $VenvPython -m pip install -r $Requirements
 & $VenvPython -m playwright install chromium
 
+$configPath = Join-Path $Root "config.json"
+$configExample = Join-Path $Root "config.example.json"
+if ((-not (Test-Path $configPath)) -and (Test-Path $configExample)) {
+    Copy-Item -LiteralPath $configExample -Destination $configPath
+}
+
 $agentScript = Join-Path $Root "telegram_app\agent.py"
 $taskName = "Paychain Control Agent"
 $startup = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
@@ -47,4 +53,4 @@ Get-Process -Name python -ErrorAction SilentlyContinue | Where-Object { $_.Path 
 Start-Process -FilePath $VenvPython -ArgumentList ('"{0}"' -f $agentScript) -WorkingDirectory $Root -WindowStyle Hidden
 
 Write-Host "Done. The agent is running in the background and waiting for Telegram pairing." -ForegroundColor Green
-Write-Host "Open the Mini App, pair this computer, and save agent-config.json into telegram_app." -ForegroundColor Yellow
+Write-Host "Open the Mini App and pair this computer. The agent will take agent-config.json from Downloads automatically." -ForegroundColor Yellow
