@@ -57,8 +57,14 @@ class Agent:
         self.login_pending = True
 
     def stop(self) -> None:
-        if self.process and self.process.poll() is None:
-            self.process.terminate()
+        process = self.process
+        if process and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
         self.process = None
         self.login_pending = False
         SIGNAL_PATH.unlink(missing_ok=True)
@@ -90,7 +96,7 @@ class Agent:
 
 def adopt_downloaded_config() -> bool:
     """Move a valid one-time pairing file downloaded on this same PC."""
-    if CONFIG_PATH.exists() or not DOWNLOAD_CONFIG_PATH.exists():
+    if not DOWNLOAD_CONFIG_PATH.exists():
         return False
     try:
         config = json.loads(DOWNLOAD_CONFIG_PATH.read_text(encoding="utf-8"))
@@ -98,6 +104,7 @@ def adopt_downloaded_config() -> bool:
         if any(not str(config.get(key, "")).strip() for key in required):
             return False
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        CONFIG_PATH.unlink(missing_ok=True)
         shutil.move(str(DOWNLOAD_CONFIG_PATH), str(CONFIG_PATH))
         return True
     except (OSError, json.JSONDecodeError):
@@ -150,7 +157,12 @@ async def run() -> None:
                     await socket.send(json.dumps({"type": "status", "running": agent.running and not agent.login_pending, "status": status}))
                     for event in agent.new_activity():
                         await socket.send(json.dumps({"type": "status", "running": agent.running, "status": "Угоду прийнято", "accepted": True, **event}))
-        except Exception:
+        except Exception as error:
+            # A 403 means the pairing token is stale (for example after a new
+            # pairing or a server redeploy). Let the next downloaded config be
+            # adopted automatically instead of requiring manual file removal.
+            if "403" in str(error) and CONFIG_PATH.exists():
+                CONFIG_PATH.unlink(missing_ok=True)
             await asyncio.sleep(5)
 
 
