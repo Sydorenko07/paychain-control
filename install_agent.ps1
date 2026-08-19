@@ -28,6 +28,8 @@ if (-not (Test-Path $VenvPython)) {
     throw "Could not create .venv. Install Python 3.11 or 3.12 and run the installer again."
 }
 
+$VenvPython = (Resolve-Path -LiteralPath $VenvPython).Path
+
 & $VenvPython -m pip install --upgrade pip
 & $VenvPython -m pip install -r $Requirements
 & $VenvPython -m playwright install chromium
@@ -41,14 +43,14 @@ if ((-not (Test-Path $configPath)) -and (Test-Path $configExample)) {
 $agentScript = Join-Path $Root "telegram_app\agent.py"
 $taskName = "Paychain Control Agent"
 $startup = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
-$shortcutPath = Join-Path $startup "Paychain Control Agent.lnk"
-$shell = New-Object -ComObject WScript.Shell
-$shortcut = $shell.CreateShortcut($shortcutPath)
-$shortcut.TargetPath = $VenvPython
-$shortcut.Arguments = ('"{0}"' -f $agentScript)
-$shortcut.WorkingDirectory = $Root
-$shortcut.WindowStyle = 7
-$shortcut.Save()
+$startupCmd = Join-Path $startup "Paychain Control Agent.cmd"
+$startupContent = @"
+@echo off
+cd /d "$Root"
+start "" /b "$VenvPython" "$agentScript"
+"@
+Set-Content -LiteralPath $startupCmd -Value $startupContent -Encoding ASCII
+Remove-Item -LiteralPath (Join-Path $startup "Paychain Control Agent.lnk") -Force -ErrorAction SilentlyContinue
 Get-Process -Name python -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $VenvPython } | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Process -FilePath $VenvPython -ArgumentList ('"{0}"' -f $agentScript) -WorkingDirectory $Root -WindowStyle Hidden
 
