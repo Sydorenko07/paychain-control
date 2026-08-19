@@ -131,33 +131,26 @@ async def accept_offer_with_double_click(page: Page, offer: Offer, settings: Set
         # Шукаємо кнопку тільки в межах цього офера
         accept_button = offer.element.locator(settings.accept_button_selector).first
 
-        # Перший клік
-        await accept_button.click(timeout=5_000)
+        # Перший клік: фіксуємо фактичну відповідь API.
+        async with page.expect_response(
+            lambda response: response.request.method == "POST" and "/accept" in response.url,
+            timeout=5_000,
+        ) as response_info:
+            await accept_button.click(timeout=5_000)
+        first_response = await response_info.value
 
-        # Дуже коротка пауза (50 мс) – щоб кліки були майже одночасними
+        # Другий клік залишається навмисно, як у поточній логіці. Якщо після
+        # першого успішного запиту рядок зник, це не скасовує перший результат.
         await page.wait_for_timeout(50)
-
-        # Другий клік (для надійності, але це може спричинити дублювання)
-        await accept_button.click(timeout=5_000)
-
-        # Невелика пауза, щоб API обробило запити
-        await page.wait_for_timeout(500)
-
-        # Перевіряємо, чи офер зник або змінив статус
         try:
-            if settings.status_selector:
-                new_status = await text_in(offer.element, settings.status_selector)
-                if new_status.casefold() not in settings.active_statuses:
-                    activity_log.info("Офер %s змінив статус на %s – прийнято.", offer.offer_id[:8], new_status)
-                    return True
+            await accept_button.click(timeout=5_000)
         except Exception:
-            # Якщо елемент зник, теж вважаємо успіх
-            if await offer.element.count() == 0:
-                activity_log.info("Офер %s зник після кліків – прийнято.", offer.offer_id[:8])
-                return True
+            pass
 
-        # Якщо офер залишився активним – можливо, кліки не спрацювали
-        activity_log.warning("Офер %s залишився активним після подвійного кліку.", offer.offer_id[:8])
+        if 200 <= first_response.status < 300:
+            activity_log.info("ПРИЙНЯТО | оффер %s | API HTTP %s", offer.offer_id[:8], first_response.status)
+            return True
+        activity_log.info("ВІДХИЛЕНО API | оффер %s | HTTP %s", offer.offer_id[:8], first_response.status)
         return False
 
     except PlaywrightTimeoutError:
