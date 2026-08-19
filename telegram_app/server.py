@@ -109,7 +109,7 @@ def row_for(owner_id: str) -> sqlite3.Row | None:
 class Command(BaseModel):
     action: str
     threshold: float | None = Field(default=None, ge=0)
-    refresh_seconds: float | None = Field(default=None, ge=1)
+    refresh_seconds: float | None = Field(default=2, ge=1)
 
 
 class BotCommand(BaseModel):
@@ -195,13 +195,11 @@ async def dispatch_command(payload: Command, owner_id: str) -> dict[str, str]:
         raise HTTPException(400, "Невідома команда.")
     if payload.action in {"start", "open_login", "set_threshold"} and payload.threshold is None:
         raise HTTPException(400, "Вкажіть суму.")
-    if payload.action in {"start", "open_login", "set_threshold"} and payload.refresh_seconds is None:
-        raise HTTPException(400, "Вкажіть інтервал оновлення.")
+    refresh_seconds = payload.refresh_seconds or 2
     message: dict[str, Any] = {"type": "command", "action": payload.action}
     if payload.threshold is not None:
         message["threshold"] = str(payload.threshold)
-    if payload.refresh_seconds is not None:
-        message["refresh_seconds"] = str(payload.refresh_seconds)
+    message["refresh_seconds"] = str(refresh_seconds)
     socket = active_agents.get(row["agent_id"])
     if payload.action == "disconnect":
         if socket:
@@ -214,7 +212,7 @@ async def dispatch_command(payload: Command, owner_id: str) -> dict[str, str]:
     await socket.send_json(message)
     with db() as connection:
         if payload.threshold is not None:
-            connection.execute("UPDATE agents SET threshold=?, refresh_seconds=?, updated_at=? WHERE agent_id=?", (str(payload.threshold), str(payload.refresh_seconds or row["refresh_seconds"]), int(time.time()), row["agent_id"]))
+            connection.execute("UPDATE agents SET threshold=?, refresh_seconds=?, updated_at=? WHERE agent_id=?", (str(payload.threshold), str(refresh_seconds), int(time.time()), row["agent_id"]))
     return {"ok": "true"}
 
 
