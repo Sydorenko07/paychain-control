@@ -293,6 +293,7 @@ def main() -> None:
     parser.add_argument("--config", type=Path, default=ROOT / "config.json")
     parser.add_argument("--auto-accept", action="store_true", help="Приймати оффери після успішного dry-run тесту")
     parser.add_argument("--minimum-amount", type=Decimal, help="Перевизначити мінімальну суму UAH із config.json")
+    parser.add_argument("--refresh-seconds", type=float, help="Інтервал оновлення сторінки в секундах")
     parser.add_argument("--start-signal", type=Path, help="Файл-сигнал запуску для вікна керування")
     args = parser.parse_args()
     configure_logging()
@@ -300,6 +301,8 @@ def main() -> None:
         settings = load_settings(args.config)
         if args.minimum_amount is not None:
             settings = replace(settings, minimum_amount_uah=args.minimum_amount)
+        if args.refresh_seconds is not None:
+            settings = replace(settings, refresh_seconds=args.refresh_seconds)
         if settings.minimum_amount_uah < 0:
             raise ValueError("minimum_amount не може бути від'ємним.")
         if settings.refresh_seconds < 1:

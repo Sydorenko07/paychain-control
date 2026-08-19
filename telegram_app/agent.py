@@ -28,30 +28,34 @@ class Agent:
         self.config = config
         self.process: subprocess.Popen[str] | None = None
         self.threshold = "5000"
+        self.refresh_seconds = "2"
         self.login_pending = False
         self.activity_position = ACTIVITY_LOG.stat().st_size if ACTIVITY_LOG.exists() else 0
 
-    def start(self, threshold: str) -> None:
+    def start(self, threshold: str, refresh_seconds: str = "2") -> None:
         if self.process and self.process.poll() is None and self.login_pending:
             self.threshold = threshold
+            self.refresh_seconds = refresh_seconds
             SIGNAL_PATH.write_text("start", encoding="utf-8")
             self.login_pending = False
             return
         self.stop()
         self.threshold = threshold
+        self.refresh_seconds = refresh_seconds
         SIGNAL_PATH.unlink(missing_ok=True)
         self.process = subprocess.Popen(
-            [str(Path(sys.executable)), str(ROOT / "main.py"), "--auto-accept", "--minimum-amount", threshold, "--start-signal", str(SIGNAL_PATH)],
+            [str(Path(sys.executable)), str(ROOT / "main.py"), "--auto-accept", "--minimum-amount", threshold, "--refresh-seconds", refresh_seconds, "--start-signal", str(SIGNAL_PATH)],
             cwd=ROOT,
         )
         SIGNAL_PATH.write_text("start", encoding="utf-8")
 
-    def open_login(self, threshold: str) -> None:
+    def open_login(self, threshold: str, refresh_seconds: str = "2") -> None:
         self.stop()
         self.threshold = threshold
+        self.refresh_seconds = refresh_seconds
         SIGNAL_PATH.unlink(missing_ok=True)
         self.process = subprocess.Popen(
-            [str(Path(sys.executable)), str(ROOT / "main.py"), "--auto-accept", "--minimum-amount", threshold, "--start-signal", str(SIGNAL_PATH)],
+            [str(Path(sys.executable)), str(ROOT / "main.py"), "--auto-accept", "--minimum-amount", threshold, "--refresh-seconds", refresh_seconds, "--start-signal", str(SIGNAL_PATH)],
             cwd=ROOT,
         )
         self.login_pending = True
@@ -134,16 +138,16 @@ async def run() -> None:
                         raw = await asyncio.wait_for(socket.recv(), timeout=1)
                         command = json.loads(raw)
                         if command["action"] == "open_login":
-                            agent.open_login(command["threshold"])
+                            agent.open_login(command["threshold"], command.get("refresh_seconds", "2"))
                         elif command["action"] == "start":
-                            agent.start(command["threshold"])
+                            agent.start(command["threshold"], command.get("refresh_seconds", "2"))
                         elif command["action"] == "stop":
                             agent.stop()
                         elif command["action"] == "set_threshold":
                             if agent.login_pending:
-                                agent.open_login(command["threshold"])
+                                agent.open_login(command["threshold"], command.get("refresh_seconds", "2"))
                             elif agent.running:
-                                agent.start(command["threshold"])
+                                agent.start(command["threshold"], command.get("refresh_seconds", "2"))
                             else:
                                 agent.threshold = command["threshold"]
                         elif command["action"] == "disconnect":

@@ -54,12 +54,16 @@ def setup_db() -> None:
                 owner_id TEXT NOT NULL,
                 token_hash TEXT NOT NULL,
                 threshold TEXT NOT NULL DEFAULT '5000',
+                refresh_seconds TEXT NOT NULL DEFAULT '2',
                 running INTEGER NOT NULL DEFAULT 0,
                 connected INTEGER NOT NULL DEFAULT 0,
                 last_status TEXT NOT NULL DEFAULT 'Не підключено',
                 updated_at INTEGER NOT NULL
             )"""
         )
+        columns = {row["name"] for row in connection.execute("PRAGMA table_info(agents)")}
+        if "refresh_seconds" not in columns:
+            connection.execute("ALTER TABLE agents ADD COLUMN refresh_seconds TEXT NOT NULL DEFAULT '2'")
 
 
 def validate_init_data(init_data: str) -> str:
@@ -105,6 +109,7 @@ def row_for(owner_id: str) -> sqlite3.Row | None:
 class Command(BaseModel):
     action: str
     threshold: float | None = Field(default=None, ge=0)
+    refresh_seconds: float | None = Field(default=None, ge=1)
 
 
 class BotCommand(BaseModel):
@@ -131,12 +136,13 @@ async def health() -> dict[str, str]:
 async def state(owner_id: str = Depends(telegram_user)) -> dict[str, Any]:
     row = row_for(owner_id)
     if not row:
-        return {"paired": False, "connected": False, "running": False, "threshold": "5000", "status": "Потрібно підключити локальний агент."}
+        return {"paired": False, "connected": False, "running": False, "threshold": "5000", "refresh_seconds": "2", "status": "Потрібно підключити локальний агент."}
     return {
         "paired": True,
         "connected": bool(row["connected"]),
         "running": bool(row["running"]),
         "threshold": row["threshold"],
+        "refresh_seconds": row["refresh_seconds"],
         "status": row["last_status"],
     }
 
@@ -189,9 +195,13 @@ async def dispatch_command(payload: Command, owner_id: str) -> dict[str, str]:
         raise HTTPException(400, "Невідома команда.")
     if payload.action in {"start", "open_login", "set_threshold"} and payload.threshold is None:
         raise HTTPException(400, "Вкажіть суму.")
+    if payload.action in {"start", "open_login", "set_threshold"} and payload.refresh_seconds is None:
+        raise HTTPException(400, "Вкажіть інтервал оновлення.")
     message: dict[str, Any] = {"type": "command", "action": payload.action}
     if payload.threshold is not None:
         message["threshold"] = str(payload.threshold)
+    if payload.refresh_seconds is not None:
+        message["refresh_seconds"] = str(payload.refresh_seconds)
     socket = active_agents.get(row["agent_id"])
     if payload.action == "disconnect":
         if socket:
@@ -204,7 +214,7 @@ async def dispatch_command(payload: Command, owner_id: str) -> dict[str, str]:
     await socket.send_json(message)
     with db() as connection:
         if payload.threshold is not None:
-            connection.execute("UPDATE agents SET threshold=?, updated_at=? WHERE agent_id=?", (str(payload.threshold), int(time.time()), row["agent_id"]))
+            connection.execute("UPDATE agents SET threshold=?, refresh_seconds=?, updated_at=? WHERE agent_id=?", (str(payload.threshold), str(payload.refresh_seconds or row["refresh_seconds"]), int(time.time()), row["agent_id"]))
     return {"ok": "true"}
 
 
