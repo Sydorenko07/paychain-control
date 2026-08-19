@@ -21,6 +21,8 @@ CONFIG_PATH = HERE / "agent-config.json"
 SIGNAL_PATH = ROOT / ".start_monitoring.signal"
 ACTIVITY_LOG = ROOT / "logs" / "activity.log"
 DOWNLOAD_CONFIG_PATH = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Downloads" / "agent-config.json"
+PROFILE_DIR = ROOT / ".browser-profile"
+LEGACY_STATE_FILE = ROOT / "storage_state.json"
 
 
 class Agent:
@@ -72,6 +74,12 @@ class Agent:
         self.process = None
         self.login_pending = False
         SIGNAL_PATH.unlink(missing_ok=True)
+
+    def clear_paychain_session(self) -> None:
+        """Remove the local browser session only on an explicit disconnect."""
+        self.stop()
+        shutil.rmtree(PROFILE_DIR, ignore_errors=True)
+        LEGACY_STATE_FILE.unlink(missing_ok=True)
 
     @property
     def running(self) -> bool:
@@ -160,7 +168,7 @@ async def run() -> None:
                             else:
                                 agent.threshold = command["threshold"]
                         elif command["action"] == "disconnect":
-                            agent.stop()
+                            agent.clear_paychain_session()
                             CONFIG_PATH.unlink(missing_ok=True)
                             await socket.close(code=1000, reason="Disconnected by user")
                             break

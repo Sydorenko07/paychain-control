@@ -202,6 +202,8 @@ async def dispatch_command(payload: Command, owner_id: str) -> dict[str, str]:
     message["refresh_seconds"] = str(refresh_seconds)
     socket = active_agents.get(row["agent_id"])
     if payload.action == "disconnect":
+        if not socket:
+            raise HTTPException(409, "Спочатку підключіть локальний агент, щоб видалити вхід на цьому ПК.")
         if socket:
             await socket.send_json(message)
         with db() as connection:

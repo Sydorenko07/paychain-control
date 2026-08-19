@@ -15,7 +15,7 @@ from pathlib import Path
 from playwright.async_api import Locator, Page, TimeoutError as PlaywrightTimeoutError, async_playwright
 
 ROOT = Path(__file__).parent
-STATE_FILE = ROOT / "storage_state.json"
+PROFILE_DIR = ROOT / ".browser-profile"
 PROCESSED_FILE = ROOT / "processed_offers.json"
 LOG_DIR = ROOT / "logs"
 activity_log = logging.getLogger("activity")
@@ -168,8 +168,13 @@ async def run(settings: Settings, auto_accept: bool, start_signal: Path | None) 
     seen_in_dry_run = set()
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
-        context = await browser.new_context(storage_state=STATE_FILE if STATE_FILE.exists() else None)
+        # A persistent profile writes cookies/session data while the browser is
+        # running. Stopping the monitor therefore does not log the user out;
+        # the profile is cleared only by an explicit local reset action.
+        context = await p.chromium.launch_persistent_context(
+            str(PROFILE_DIR),
+            headless=False,
+        )
         page = await context.new_page()
         await page.goto(settings.offers_url)
 
