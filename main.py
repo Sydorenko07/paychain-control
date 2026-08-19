@@ -82,6 +82,12 @@ def parse_amount(raw: str) -> Decimal:
         raise ValueError(f"Не вдалося розібрати суму: {raw!r}") from error
 
 
+def normalize_currency(raw: str) -> str:
+    """Extract the currency code from cells such as ``UAH 1016.50``."""
+    match = re.search(r"\b(UAH|USD|EUR|USDT)\b", raw.upper())
+    return match.group(1) if match else raw.strip().upper()
+
+
 def load_processed() -> set[str]:
     if not PROCESSED_FILE.exists():
         return set()
@@ -162,7 +168,7 @@ async def accept_offer_with_double_click(page: Page, offer: Offer, settings: Set
         return False
 
 
-async def run(settings: Settings, auto_accept: bool, start_signal: Path | None) -> None:
+async def run(settings: Settings, auto_accept: bool, start_signal: Path | None, minimized: bool) -> None:
     processed = load_processed()
     reported = set()
     seen_in_dry_run = set()
@@ -171,9 +177,9 @@ async def run(settings: Settings, auto_accept: bool, start_signal: Path | None) 
         # A persistent profile writes cookies/session data while the browser is
         # running. Stopping the monitor therefore does not log the user out;
         # the profile is cleared only by an explicit local reset action.
+        launch_args = ["--start-minimized"] if minimized else []
         context = await p.chromium.launch_persistent_context(
-            str(PROFILE_DIR),
-            headless=False,
+            str(PROFILE_DIR), headless=False, args=launch_args
         )
         page = await context.new_page()
         await page.goto(settings.offers_url)
@@ -194,6 +200,7 @@ async def run(settings: Settings, auto_accept: bool, start_signal: Path | None) 
                 await page.wait_for_load_state("load")
 
                 offer_elements = await page.locator(settings.offer_selector).all()
+                activity_log.info("СКАНУВАННЯ | знайдено рядків: %d", len(offer_elements))
                 current_offers = []
 
                 for element in offer_elements:
@@ -206,10 +213,10 @@ async def run(settings: Settings, auto_accept: bool, start_signal: Path | None) 
 
                         amount_text = await text_in(element, settings.amount_selector)
                         amount = parse_amount(amount_text)
-                        currency = await text_in(element, settings.currency_selector)
+                        currency = normalize_currency(await text_in(element, settings.currency_selector))
 
                         if settings.status_selector:
-                            status = await text_in(element, settings.status_selector)
+                            status = (await text_in(element, settings.status_selector)).strip().casefold()
                         else:
                             status = "active"
 
@@ -300,6 +307,7 @@ def main() -> None:
     parser.add_argument("--minimum-amount", type=Decimal, help="Перевизначити мінімальну суму UAH із config.json")
     parser.add_argument("--refresh-seconds", type=float, help="Інтервал оновлення сторінки в секундах")
     parser.add_argument("--start-signal", type=Path, help="Файл-сигнал запуску для вікна керування")
+    parser.add_argument("--minimized", action="store_true", help="Запустити браузер мінімізованим")
     args = parser.parse_args()
     configure_logging()
     try:
@@ -312,7 +320,7 @@ def main() -> None:
             raise ValueError("minimum_amount не може бути від'ємним.")
         if settings.refresh_seconds < 1:
             raise ValueError("refresh_seconds не може бути меншим за 1 секунду.")
-        asyncio.run(run(settings, args.auto_accept, args.start_signal))
+        asyncio.run(run(settings, args.auto_accept, args.start_signal, args.minimized))
     except (OSError, ValueError, json.JSONDecodeError) as error:
         logging.error("Конфігурація: %s", error)
         raise SystemExit(2) from error

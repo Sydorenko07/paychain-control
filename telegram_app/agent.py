@@ -46,7 +46,7 @@ class Agent:
         self.refresh_seconds = refresh_seconds
         SIGNAL_PATH.unlink(missing_ok=True)
         self.process = subprocess.Popen(
-            [str(Path(sys.executable)), str(ROOT / "main.py"), "--auto-accept", "--minimum-amount", threshold, "--refresh-seconds", refresh_seconds, "--start-signal", str(SIGNAL_PATH)],
+            [str(Path(sys.executable)), str(ROOT / "main.py"), "--auto-accept", "--minimum-amount", threshold, "--refresh-seconds", refresh_seconds, "--start-signal", str(SIGNAL_PATH), "--minimized"],
             cwd=ROOT,
         )
         SIGNAL_PATH.write_text("start", encoding="utf-8")
