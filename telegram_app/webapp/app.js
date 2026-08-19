@@ -11,5 +11,19 @@ async function refresh() { try { const s = await request('/api/state'); if (!thr
 async function command(action) { try { const refreshSeconds=Number($('refresh_seconds').value); if (!Number.isFinite(refreshSeconds) || refreshSeconds < 1) throw new Error('Введіть інтервал від 1 секунди.'); await request('/api/command',{method:'POST',body:JSON.stringify({action,threshold:Number($('threshold').value),refresh_seconds:refreshSeconds})}); thresholdDirty = false; refreshDirty = false; await refresh(); } catch(e) { const message = e.message === 'Локальний агент не підключений.' ? 'Спочатку натисніть «Підключити цей ПК».' : e.message; tg?.showAlert?.(message) || alert(message); } }
 $('login').onclick=()=>command('open_login'); $('start').onclick=()=>command('start'); $('stop').onclick=()=>command('stop');
 $('disconnect').onclick=()=>{ if(confirm('Відключити цей ПК від Telegram-бота? Моніторинг буде зупинено.')) command('disconnect'); };
- $('pair').onclick=async()=>{ try { const c=await request('/api/pair',{method:'POST'}); const config={server_ws_url:location.origin.replace('https','wss').replace('http','ws')+'/ws/agent',agent_id:c.agent_id,agent_token:c.agent_token}; const blob=new Blob([JSON.stringify(config,null,2)],{type:'application/json'}); const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='agent-config.json'; document.body.appendChild(link); link.click(); setTimeout(()=>{ URL.revokeObjectURL(link.href); link.remove(); },1000); $('credentials').hidden=false; $('credentials').textContent='Підключення створено. Агент сам забере конфігурацію із папки «Завантаження».'; $('pair').disabled=true; } catch(e) { alert(e.message); } };
+ $('pair').onclick=async()=>{ try {
+   const c=await request('/api/pair',{method:'POST'});
+   const config={server_ws_url:location.origin.replace('https','wss').replace('http','ws')+'/ws/agent',agent_id:c.agent_id,agent_token:c.agent_token};
+   const blob=new Blob([JSON.stringify(config,null,2)],{type:'application/json'});
+   const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='agent-config.json';
+   document.body.appendChild(link); link.click(); setTimeout(()=>{ URL.revokeObjectURL(link.href); link.remove(); },1000);
+   $('credentials').hidden=false; $('credentials').textContent='Файл передано агенту. Очікую автоматичне підключення…'; $('pair').disabled=true;
+   for (let attempt=0; attempt<12; attempt++) {
+     await new Promise(resolve=>setTimeout(resolve,1000));
+     const state=await request('/api/state');
+     if (state.connected) { $('credentials').textContent='Агент підключено. Можна відкривати Paychain або запускати алгоритм.'; await refresh(); return; }
+   }
+   $('credentials').textContent='Файл завантажено. Якщо підключення не з’явилось за 12 секунд, запустіть агент через START/install_agent.cmd один раз.';
+   await refresh();
+ } catch(e) { $('pair').disabled=false; alert(e.message); } };
 refresh(); setInterval(refresh, 5000);

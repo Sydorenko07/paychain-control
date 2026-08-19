@@ -99,20 +99,29 @@ class Agent:
 
 
 def adopt_downloaded_config() -> bool:
-    """Move a valid one-time pairing file downloaded on this same PC."""
-    if not DOWNLOAD_CONFIG_PATH.exists():
-        return False
-    try:
-        config = json.loads(DOWNLOAD_CONFIG_PATH.read_text(encoding="utf-8"))
-        required = ("server_ws_url", "agent_id", "agent_token")
-        if any(not str(config.get(key, "")).strip() for key in required):
-            return False
-        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        CONFIG_PATH.unlink(missing_ok=True)
-        shutil.move(str(DOWNLOAD_CONFIG_PATH), str(CONFIG_PATH))
-        return True
-    except (OSError, json.JSONDecodeError):
-        return False
+    """Move the newest valid pairing file downloaded on this same PC.
+
+    Browsers append `` (1)``, `` (2)`` ... when the file already exists, so
+    looking only for the exact name makes reconnecting appear to do nothing.
+    """
+    candidates = [
+        path for path in DOWNLOAD_CONFIG_PATH.parent.glob("agent-config*.json")
+        if path.is_file()
+    ]
+    candidates.sort(key=lambda path: path.stat().st_mtime, reverse=True)
+    required = ("server_ws_url", "agent_id", "agent_token")
+    for downloaded in candidates:
+        try:
+            config = json.loads(downloaded.read_text(encoding="utf-8"))
+            if any(not str(config.get(key, "")).strip() for key in required):
+                continue
+            CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            CONFIG_PATH.unlink(missing_ok=True)
+            shutil.move(str(downloaded), str(CONFIG_PATH))
+            return True
+        except (OSError, json.JSONDecodeError):
+            continue
+    return False
 
 
 async def run() -> None:
