@@ -159,17 +159,17 @@ async def accept_offer_with_double_click(page: Page, offer: Offer, settings: Set
             if settings.status_selector:
                 new_status = (await text_in(offer.element, settings.status_selector)).strip().casefold()
                 if new_status not in settings.active_statuses:
-                    activity_log.info("Офер %s змінив статус на %s – прийнято.", offer.offer_id[:8], new_status)
+                    activity_log.info("ПРИЙНЯТО | оффер %s | %s %s", offer.offer_id, offer.amount, offer.currency)
                     return True
             else:
                 # Якщо селектор статусу не задано, перевіряємо, чи зник елемент
                 if await offer.element.count() == 0:
-                    activity_log.info("Офер %s зник – прийнято.", offer.offer_id[:8])
+                    activity_log.info("ПРИЙНЯТО | оффер %s | %s %s", offer.offer_id, offer.amount, offer.currency)
                     return True
         except Exception:
             # Якщо елемент зник або сталася помилка – вважаємо, що прийнято
             if await offer.element.count() == 0:
-                activity_log.info("Офер %s зник – прийнято.", offer.offer_id[:8])
+                activity_log.info("ПРИЙНЯТО | оффер %s | %s %s", offer.offer_id, offer.amount, offer.currency)
                 return True
 
         activity_log.warning("Офер %s залишився активним після подвійного кліку.", offer.offer_id[:8])
