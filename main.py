@@ -120,13 +120,15 @@ async def text_in(locator: Locator, selector: str) -> str:
 async def select_thirty_rows(page: Page) -> None:
     """Set Paychain's paginator to show 30 offers when the control is present."""
     dropdown = page.locator("p-select.p-paginator-rpp-dropdown").first
-    if await dropdown.count() == 0:
+    try:
+        await dropdown.wait_for(state="visible", timeout=10_000)
+    except PlaywrightTimeoutError:
         return
     label = dropdown.locator("[role='combobox']").first
     if (await label.inner_text()).strip() == "30":
         return
     await dropdown.locator("[role='button'][aria-label='dropdown trigger']").click(timeout=5_000)
-    option = page.get_by_role("option", name="30", exact=True).last
+    option = page.locator("[role='option']").filter(has_text=re.compile(r"^\s*30\s*$")).last
     await option.click(timeout=5_000)
     await page.wait_for_timeout(300)
 
