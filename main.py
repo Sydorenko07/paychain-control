@@ -117,6 +117,20 @@ async def text_in(locator: Locator, selector: str) -> str:
     return await locator.locator(selector).first.inner_text()
 
 
+async def select_thirty_rows(page: Page) -> None:
+    """Set Paychain's paginator to show 30 offers when the control is present."""
+    dropdown = page.locator("p-select.p-paginator-rpp-dropdown").first
+    if await dropdown.count() == 0:
+        return
+    label = dropdown.locator("[role='combobox']").first
+    if (await label.inner_text()).strip() == "30":
+        return
+    await dropdown.locator("[role='button'][aria-label='dropdown trigger']").click(timeout=5_000)
+    option = page.get_by_role("option", name="30", exact=True).last
+    await option.click(timeout=5_000)
+    await page.wait_for_timeout(300)
+
+
 async def verify_amount_twice(page: Page, offer: Offer, settings: Settings) -> Decimal | None:
     try:
         await page.wait_for_timeout(100)
@@ -191,6 +205,10 @@ async def run_instance(settings: Settings, auto_accept: bool, start_signal: Path
     seen_in_dry_run = set()
 
     await page.goto(settings.offers_url)
+    try:
+        await select_thirty_rows(page)
+    except PlaywrightTimeoutError:
+        logging.warning("Не вдалося вибрати 30 оферів на сторінці")
 
     if start_signal:
         while not start_signal.exists():
