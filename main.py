@@ -227,6 +227,22 @@ async def run_instance(settings: Settings, auto_accept: bool, start_signal: Path
             await page.reload(timeout=10_000)
             await page.wait_for_load_state("load")
 
+            # Paychain renders the table asynchronously after the initial
+            # page load.  Give Angular a short window to insert either an
+            # offer row or the empty-table placeholder before scanning.
+            try:
+                # Do not wait for any generic table row: the header is also
+                # a role="row" and would release the wait too early.  Wait
+                # specifically for an offer row containing the currency, or
+                # for the explicit empty-table placeholder.
+                await page.locator(
+                    f"{settings.offer_selector}, app-empty-table"
+                ).first.wait_for(state="visible", timeout=1000)
+            except PlaywrightTimeoutError:
+                # The page may still be loading or may contain neither
+                # element; the normal scan below will record the result.
+                pass
+
             offer_elements = await page.locator(settings.offer_selector).all()
             # Paychain sometimes renders rows without the mdc-data-table row
             # class, while keeping the semantic role="row" attribute.
