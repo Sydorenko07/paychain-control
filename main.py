@@ -208,6 +208,12 @@ async def run_instance(settings: Settings, auto_accept: bool, start_signal: Path
             await page.wait_for_load_state("load")
 
             offer_elements = await page.locator(settings.offer_selector).all()
+            # Paychain sometimes renders rows without the mdc-data-table row
+            # class, while keeping the semantic role="row" attribute.
+            if not offer_elements:
+                fallback_selector = "tr[role='row']:has(td:has-text('UAH'))"
+                if settings.offer_selector != fallback_selector:
+                    offer_elements = await page.locator(fallback_selector).all()
             activity_log.info("Вікно %d | СКАНУВАННЯ | знайдено рядків: %d", window_id, len(offer_elements))
             current_offers = []
 
